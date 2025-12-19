@@ -442,8 +442,8 @@ st.markdown("""
     h1 {
         font-size: 2.2rem;
         font-weight: 700;
-        color: #2c3e50;
-        border-bottom: 2px solid #ecf0f1;
+        color:
+        border-bottom: 2px solid
         padding-bottom: 10px;
         margin-bottom: 30px;
     }
@@ -452,17 +452,17 @@ st.markdown("""
     h3 {
         font-size: 1.4rem;
         font-weight: 600;
-        color: #34495e;
+        color:
         margin-top: 20px;
         margin-bottom: 15px;
     }
     
     /* カード風デザイン */
     .detail-card {
-        background-color: #ffffff;
+        background-color:
         padding: 24px;
         border-radius: 8px;
-        border: 1px solid #e0e0e0;
+        border: 1px solid
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         margin-top: 20px;
     }
@@ -477,25 +477,25 @@ st.markdown("""
     /* ラベルのスタイル */
     .label {
         font-size: 0.85rem;
-        color: #7f8c8d;
+        color:
         margin-bottom: 4px;
     }
     .value {
         font-size: 1.1rem;
-        color: #2c3e50;
+        color:
         font-weight: 500;
         margin-bottom: 16px;
     }
     
     /* あらすじボックス */
     .story-box {
-        background-color: #f8f9fa;
+        background-color:
         padding: 16px;
         border-radius: 6px;
         line-height: 1.6;
-        color: #4a5568;
+        color:
         font-size: 0.95rem;
-        border-left: 4px solid #3498db;
+        border-left: 4px solid
     }
 </style>
 """, unsafe_allow_html=True)
@@ -513,7 +513,7 @@ if df_master.empty:
 # フィルタ
 # ==================================================
 st.sidebar.header("絞り込み")
-st.sidebar.caption("初回投稿日が2024年2月1日以降かつ第14回ネット小説大賞の作品を表示中")
+st.sidebar.caption("初回投稿日が2024年2月1日以降かつ第14回ネット小説大賞の投稿作品を表示中")
 
 genres = ["すべて"]
 if "genre" in df_master.columns:
@@ -566,10 +566,10 @@ elif "総合評価ポイント" in sort_map:
     default_sort_index = list(sort_map.keys()).index("総合評価ポイント")
 
 sort_col_label = st.sidebar.selectbox("ソート項目", list(sort_map.keys()), index=default_sort_index)
-sort_order = st.sidebar.radio("順序", ["降順", "昇順"], index=0) # デフォルト降順
+sort_order = st.sidebar.radio("順序", ["降順", "昇順"], index=0)
 
 st.sidebar.markdown("---")
-with st.sidebar.expander("用語説明"):
+with st.sidebar.expander("ヘルプ"):
     st.markdown("""
     <div style="font-size: 0.85rem; color: #555;">
     <b>初回掲載日</b><br>
@@ -581,7 +581,16 @@ with st.sidebar.expander("用語説明"):
     <b>日間ポイント</b><br>
     ランキング集計時点から過去24時間以内で新たに登録されたブックマークや評価が対象。毎日3回程度更新。<br><br>
     <b>週間UU数</b><br>
-    前週の日曜日から土曜日分のユニークの合計。毎週火曜日早朝に更新。
+    前週の日曜日から土曜日分のユニークの合計。毎週火曜日早朝に更新。<br><br>
+    <hr>
+    <b>評価優先順位</b><br>
+    原作管理チーム、一般編集問わず、評価の中にNGがある場合はNGに振り分け。<br>
+    <br>
+    原作管理チームの中で○と△と×で評価が混在する場合、よりポジティブな評価を優先して振り分けされる。<br>
+    ○＞△＞×<br>
+    <br>
+    一般編集の中で○と△と×で評価が混在する場合、よりポジティブな評価を優先して振り分けされる。<br>
+    ○＞△＞×
     </div>
     """, unsafe_allow_html=True)
 
@@ -823,7 +832,7 @@ def main_content(user_name):
         /* ラジオボタンのコンテナ */
         div[role="radiogroup"] {
             background-color: transparent;
-            border-bottom: 2px solid #f0f2f6;
+            border-bottom: 2px solid
             padding-bottom: 0px;
             gap: 0px;
         }
@@ -841,8 +850,8 @@ def main_content(user_name):
 
         /* ホバー時 */
         div[role="radiogroup"] > label:hover {
-            background-color: #f8f9fa !important;
-            color: #ff4b4b;
+            background-color:
+            color:
         }
 
         /* 丸ポチを非表示にする */
@@ -873,9 +882,9 @@ def main_content(user_name):
         */
         
         div[role="radiogroup"] label:has(input:checked) {
-            border-bottom: 3px solid #ff4b4b !important; /* Streamlitの赤色 */
-            color: #ff4b4b;
-            background-color: #fff;
+            border-bottom: 3px solid
+            color:
+            background-color:
         }
         
         /* :has非対応環境へのフォールバック（完全ではないが、文字色等は変わる） */
@@ -1115,7 +1124,7 @@ def main_content(user_name):
                 "コメント", 
                 value=initial_comment, 
                 height=100, 
-                key=f"input_comment_area_{row['ncode']}", # キーを一意にして自動クリアさせる
+                key=f"input_comment_area_{row['ncode']}",
                 on_change=on_comment_change
             )
 
@@ -1185,6 +1194,6 @@ def main_content(user_name):
             else:
                 st.info("まだ評価はありません")
 
-    st.write("") # 下部余白
+    st.write("")
 
 main_content(user_name)
