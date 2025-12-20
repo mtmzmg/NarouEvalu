@@ -635,7 +635,7 @@ def render_novel_list(df_in, key_suffix):
     gb.configure_grid_options(domLayout='normal')
 
     gb.configure_column("ncode", header_name="Nコード", width=150, sortable=True)
-    gb.configure_column("title", header_name="タイトル", width=67670, wrapText=True, autoHeight=True, sortable=True)
+    gb.configure_column("title", header_name="タイトル", width=670, wrapText=True, autoHeight=True, sortable=True)
     gb.configure_column("userid", hide=True)
     gb.configure_column("writer", header_name="著者", width=150, sortable=True)
     gb.configure_column("story", hide=True)
