@@ -566,7 +566,7 @@ elif "総合評価ポイント" in sort_map:
     default_sort_index = list(sort_map.keys()).index("総合評価ポイント")
 
 sort_col_label = st.sidebar.selectbox("ソート項目", list(sort_map.keys()), index=default_sort_index)
-sort_order = st.sidebar.radio("順序", ["降順", "昇順"], index=0)          
+sort_order = st.sidebar.radio("順序", ["降順", "昇順"], index=0)
 
 st.sidebar.markdown("---")
 with st.sidebar.expander("ヘルプ"):
@@ -595,6 +595,104 @@ with st.sidebar.expander("ヘルプ"):
     ○＞△＞×
     </div>
     """, unsafe_allow_html=True)
+
+# ==================================================
+# データエクスポート
+# ==================================================
+st.sidebar.markdown("---")
+
+df_export_base = get_processed_novel_data(user_name)
+df_export = apply_local_patches(df_export_base, user_name)
+
+if "is_unclassified" in df_export.columns:
+    df_export = df_export[~df_export["is_unclassified"].fillna(True)]
+else:
+    df_export = pd.DataFrame()
+
+if not df_export.empty:
+    df_all_ratings = load_all_ratings_table().copy()
+
+    if "local_rating_patches" in st.session_state and st.session_state["local_rating_patches"]:
+        patches = st.session_state["local_rating_patches"]
+        for ncode_patch, patch_data in patches.items():
+            mask = (df_all_ratings["ncode"] == ncode_patch) & (df_all_ratings["user_name"] == user_name)
+            if df_all_ratings[mask].empty:
+                new_row = {
+                    "ncode": ncode_patch,
+                    "user_name": user_name,
+                    "rating": patch_data["rating"],
+                    "comment": patch_data["comment"],
+                    "role": patch_data["role"],
+                    "updated_at": patch_data["updated_at"]
+                }
+                df_all_ratings = pd.concat([df_all_ratings, pd.DataFrame([new_row])], ignore_index=True)
+            else:
+                df_all_ratings.loc[mask, "rating"] = patch_data["rating"]
+                df_all_ratings.loc[mask, "comment"] = patch_data["comment"]
+                df_all_ratings.loc[mask, "role"] = patch_data["role"]
+                df_all_ratings.loc[mask, "updated_at"] = patch_data["updated_at"]
+    
+    target_ncodes = df_export["ncode"].unique()
+    df_target_ratings = df_all_ratings[df_all_ratings["ncode"].isin(target_ncodes)].copy()
+
+    def aggregate_ratings(group):
+        ratings = []
+        comments = []
+        for _, row in group.iterrows():
+            u = row.get("user_name", "")
+            r = row.get("rating", "")
+            c = row.get("comment", "")
+            
+            if pd.notna(r) and str(r).strip() != "":
+                ratings.append(f"{u}：{r}")
+            
+            if pd.notna(c) and str(c).strip() != "":
+                comments.append(f"{u}：{c}")
+        
+        return pd.Series({
+            "ratings_aggregated": "、".join(ratings),
+            "comments_aggregated": "、".join(comments)
+        })
+
+    if not df_target_ratings.empty:
+        df_agg = df_target_ratings.groupby("ncode").apply(aggregate_ratings).reset_index()
+        df_export = pd.merge(df_export, df_agg, on="ncode", how="left")
+    else:
+        df_export["ratings_aggregated"] = ""
+        df_export["comments_aggregated"] = ""
+
+    export_cols = {
+        "ncode": "Nコード",
+        "title": "タイトル",
+        "writer": "著者名",
+        "genre": "ジャンル",
+        "general_firstup": "初回掲載日",
+        "general_lastup": "最終掲載日",
+        "general_all_no": "話数",
+        "length": "文字数",
+        "global_point": "総合評価ポイント",
+        "ratings_aggregated": "評価",
+        "comments_aggregated": "コメント"
+    }
+
+    valid_cols = {k: v for k, v in export_cols.items() if k in df_export.columns}
+
+    df_csv = df_export[list(valid_cols.keys())].rename(columns=valid_cols)
+    
+    if "Nコード" in df_csv.columns:
+        df_csv = df_csv.sort_values("Nコード")
+
+        csv_str = df_csv.to_csv(index=False)
+        csv_bytes = csv_str.encode('utf-8-sig')
+
+        st.sidebar.download_button(
+            label="評価済みリストをCSV出力",
+            data=csv_bytes,
+            file_name=f"reviewed_novels_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+else:
+    st.sidebar.caption("評価済みの作品はありません")
 
 
 # ==================================================
@@ -658,7 +756,7 @@ def render_novel_list(df_in, key_suffix):
     gb.configure_column("istensei", hide=True)
     gb.configure_column("istenni", hide=True)
     gb.configure_column("global_point", header_name="総合評価ポイント", width=190, filter=False, sortable=True)
-    gb.configure_column("daily_point", header_name="日間ポイント", width=150, filter=False, sortable=True)
+    gb.configure_column("daily_point", header_name="日間ポイント", width=1550, filter=False, sortable=True)
     gb.configure_column("weekly_point", hide=True)
     gb.configure_column("monthly_point", hide=True)
     gb.configure_column("quarter_point", hide=True)
@@ -1126,7 +1224,7 @@ def main_content(user_name):
                 "コメント", 
                 value=initial_comment, 
                 height=100, 
-                key=f"input_comment_area_{row['ncode']}",\
+                key=f"input_comment_area_{row['ncode']}",
                 on_change=on_comment_change
             )
 
@@ -1196,6 +1294,6 @@ def main_content(user_name):
             else:
                 st.info("まだ評価はありません")
 
-    st.write("")       
+    st.write("")
 
 main_content(user_name)
