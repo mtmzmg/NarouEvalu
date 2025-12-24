@@ -12,6 +12,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 # ==================================================
 # 定数定義
 # ==================================================
+pd.set_option('future.no_silent_downcasting', True)
+
 try:
     auth_config = st.secrets["auth"]
     USER_LIST = auth_config["users"]
@@ -858,7 +860,7 @@ if not df_export.empty:
         })
 
     if not df_target_ratings.empty:
-        df_agg = df_target_ratings.groupby("ncode")[["user_name", "rating", "comment"]].apply(aggregate_ratings).reset_index()
+        df_agg = df_target_ratings.groupby("ncode", include_groups=False)[["user_name", "rating", "comment"]].apply(aggregate_ratings).reset_index()
         df_export = pd.merge(df_export, df_agg, on="ncode", how="left")
     else:
         df_export["ratings_aggregated"] = ""
@@ -1505,7 +1507,7 @@ def main_content(user_name):
                 st.dataframe(
                     disp_ratings, 
                     hide_index=True, 
-                    use_container_width=True,
+                    width="stretch", # use_container_width=True is deprecated
                     column_config={
                         "名前": st.column_config.TextColumn(width="small"),
                         "評価": st.column_config.TextColumn(width="small"),
