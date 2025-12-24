@@ -507,7 +507,7 @@ def get_processed_novel_data(user_name):
         
         if not others_df.empty:
             others_df["_temp_summary"] = others_df["user_name"] + ":" + others_df["rating"]
-            others_agg = others_df.groupby("ncode")["_temp_summary"].apply(lambda x: " ".join(x)).reset_index()
+            others_agg = others_df.groupby("ncode")["_temp_summary"].agg(" ".join).reset_index()
             others_agg.columns = ["ncode", "other_ratings_text"]
             df = pd.merge(df, others_agg, on="ncode", how="left")
     
