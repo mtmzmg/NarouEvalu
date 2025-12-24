@@ -4,6 +4,7 @@ import time
 import os
 import duckdb
 import glob
+import gc
 from datetime import datetime, timedelta, timezone
 from supabase import create_client
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
@@ -158,6 +159,8 @@ def load_master_data():
     for col in date_cols:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
+
+    gc.collect()
 
     return df
 
