@@ -7,7 +7,7 @@ import glob
 import gc
 from datetime import datetime, timedelta, timezone
 from supabase import create_client
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # ==================================================
 # 定数定義
@@ -475,7 +475,7 @@ def get_processed_novel_data(user_name):
             if col not in df.columns:
                 df[col] = False
             else:
-                df[col] = df[col].fillna(False)
+                df[col] = df[col].fillna(False).astype(bool)
 
         evaluated_ncodes = df_classification["ncode"].unique()
         df.loc[~df["ncode"].isin(evaluated_ncodes), "is_unclassified"] = True
@@ -711,9 +711,9 @@ if "日間ポイント" in sort_map:
 elif "総合評価ポイント" in sort_map:
     default_sort_index = list(sort_map.keys()).index("総合評価ポイント")
 
-sort_col_label = st.sidebar.selectbox("", list(sort_map.keys()), index=default_sort_index, label_visibility="collapsed")
+sort_col_label = st.sidebar.selectbox("並び替え項目", list(sort_map.keys()), index=default_sort_index, label_visibility="collapsed")
 if st.session_state.get("data_loaded", False):
-    sort_order = st.sidebar.radio("", ["降順", "昇順"], index=0, horizontal=True, label_visibility="collapsed")
+    sort_order = st.sidebar.radio("昇順・降順", ["降順", "昇順"], index=0, horizontal=True, label_visibility="collapsed")
 else:
     if "sort_order" not in st.session_state:
         st.session_state["sort_order"] = "降順"
@@ -741,7 +741,7 @@ genre = st.sidebar.selectbox("ジャンル", genres)
 
 col_check, col_label = st.sidebar.columns([0.15, 0.85])
 with col_check:
-    filter_netcon14 = st.checkbox("", value=True, key="filter_netcon14", label_visibility="collapsed")
+    filter_netcon14 = st.checkbox("第14回ネットコン応募作品", value=True, key="filter_netcon14", label_visibility="collapsed")
 with col_label:
     st.markdown('<p style="font-size: 0.8em; color: #666; margin-top: 0.5rem; margin-bottom: 0; text-align: left;">第14回ネット小説大賞応募作品を表示</p>', unsafe_allow_html=True)
 
@@ -858,7 +858,7 @@ if not df_export.empty:
         })
 
     if not df_target_ratings.empty:
-        df_agg = df_target_ratings.groupby("ncode").apply(aggregate_ratings).reset_index()
+        df_agg = df_target_ratings.groupby("ncode")[["user_name", "rating", "comment"]].apply(aggregate_ratings).reset_index()
         df_export = pd.merge(df_export, df_agg, on="ncode", how="left")
     else:
         df_export["ratings_aggregated"] = ""
@@ -992,7 +992,7 @@ def render_novel_list(df_in, key_suffix):
     grid_response = AgGrid(
         display_df,
         gridOptions=gridOptions,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        update_on=['selectionChanged'],
         fit_columns_on_grid_load=False,
         height=500,
         theme='streamlit',
