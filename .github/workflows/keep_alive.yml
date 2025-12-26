@@ -1,0 +1,30 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    - cron: '0 23,11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Update dummy file to trigger deploy
+        run: |
+          # 日付をファイルに書き込んで変更を作る
+          date > last_restarted.txt
+          
+          # Gitのユーザー設定（Botとしてコミットする）
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          # コミットしてプッシュ
+          git add last_restarted.txt
+          git commit -m "Auto-restart: keep app alive"
+          git push
