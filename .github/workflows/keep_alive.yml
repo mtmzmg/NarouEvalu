@@ -1,15 +1,49 @@
-name: Keep Streamlit App Alive (Ping Only)
+name: Keep Streamlit App Alive (Browser)
 
 on:
   schedule:
-    - cron: '0 15,21,3,9 * * *'
+    - cron: '0 0,8,16 * * *'
   workflow_dispatch:
 
 jobs:
-  ping-app:
+  wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping App URL
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Selenium
         run: |
-          curl -I https://narouevalu-pgj8tq2tdlccjybdx88kvd.streamlit.app/ || true
-          echo "Ping sent to app!"
+          pip install selenium webdriver-manager
+
+      - name: Visit App with Selenium
+        shell: python
+        run: |
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.chrome.service import Service
+          from webdriver_manager.chrome import ChromeDriverManager
+          import time
+
+          APP_URL = "https://narouevalu-pgj8tq2tdlccjybdx88kvd.streamlit.app/"
+
+          chrome_options = Options()
+          chrome_options.add_argument("--headless")
+          chrome_options.add_argument("--no-sandbox")
+          chrome_options.add_argument("--disable-dev-shm-usage")
+
+          service = Service(ChromeDriverManager().install())
+          driver = webdriver.Chrome(service=service, options=chrome_options)
+
+          print(f"Visiting {APP_URL} ...")
+          try:
+              driver.get(APP_URL)
+              time.sleep(30)
+              print(f"Page Title: {driver.title}")
+              print("Success! App should be awake.")
+          except Exception as e:
+              print(f"Error: {e}")
+          finally:
+              driver.quit()
