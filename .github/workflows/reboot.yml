@@ -23,7 +23,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          TARGET_FILE="NarouEvalu/reboot_trigger.py"
+          TARGET_FILE="reboot_trigger.py"
           
           mkdir -p $(dirname $TARGET_FILE)
 
