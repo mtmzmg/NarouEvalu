@@ -18,15 +18,13 @@ jobs:
         with:
           ref: main
 
-      - name: Update trigger file in App Directory
+      - name: Update trigger file in Root Directory
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
           TARGET_FILE="reboot_trigger.py"
           
-          mkdir -p $(dirname $TARGET_FILE)
-
           echo "# Last reboot: $(date)" > $TARGET_FILE
           
           git add $TARGET_FILE
