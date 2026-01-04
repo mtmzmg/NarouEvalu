@@ -167,7 +167,6 @@ def load_master_data():
 
 @st.cache_data(ttl=3600)
 def load_novel_story(ncode):
-    """指定されたNコードのあらすじのみを取得する"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     parquet_pattern = os.path.join(base_dir, "narou_novels_part*.parquet")
     
@@ -198,11 +197,6 @@ def load_novel_story(ncode):
 
 @st.cache_data(ttl=300)
 def search_ncodes_by_duckdb(search_keyword_str, exclude_keyword_str):
-    """
-    DuckDBを使ってParquetファイルから高速に検索を行い、
-    条件に合致するNコードのリストを返す。
-    メモリに全データを展開せずにあらすじ検索が可能。
-    """
     if not search_keyword_str and not exclude_keyword_str:
         return None
 
@@ -274,13 +268,11 @@ def load_user_ratings(user_name):
 
 @st.cache_data(ttl=900)
 def load_all_ratings_table():
-    """全ユーザーの評価を取得（分類用）"""
     res = supabase.table("user_ratings").select("*").execute()
     return pd.DataFrame(res.data)
 
 @st.cache_data(ttl=900)
 def load_novel_ratings_all(ncode):
-    """特定作品の全ユーザー評価を取得"""
     try:
         res = (
             supabase.table("user_ratings")
@@ -293,13 +285,11 @@ def load_novel_ratings_all(ncode):
         return pd.DataFrame()
 
 def get_jst_now():
-    """JSTの現在時刻を取得してISOフォーマット文字列で返す"""
     JST = timezone(timedelta(hours=9), 'JST')
     return datetime.now(JST).isoformat()
 
 
 def save_rating(ncode, user_name, rating, comment, role):
-    """評価を保存"""
     data = {
         "ncode": ncode,
         "user_name": user_name,
@@ -324,7 +314,6 @@ def save_rating(ncode, user_name, rating, comment, role):
     return True
 
 def on_rating_button_click(ncode, user_name, target_rating, current_rating, role):
-    """評価ボタン押下時のコールバック"""
     comment = st.session_state.get(f"input_comment_area_{ncode}", "")
     
     new_rating = None if current_rating == target_rating else target_rating
@@ -332,7 +321,6 @@ def on_rating_button_click(ncode, user_name, target_rating, current_rating, role
     save_rating(ncode, user_name, new_rating, comment, role)
 
 def save_comment_only(ncode, user_name, comment, role):
-    """コメントのみ保存（評価は維持）"""
     current = load_user_ratings(user_name)
     current_rating = None
     if not current.empty:
@@ -362,9 +350,6 @@ def save_comment_only(ncode, user_name, comment, role):
     }
 
 def determine_status(sub_df):
-    """
-    データフレーム（特定作品の評価一覧）からステータスフラグを判定する
-    """
     flags = {
         "is_ng": False,
         "is_admin_evaluated": False,
@@ -409,10 +394,6 @@ def determine_status(sub_df):
 
 
 def calculate_novel_status(df_ratings):
-    """
-    全評価データから作品ごとの分類ステータスを算出（ベクトル化による高速版）
-    優先度: NG > 原作管理× > ○ > △ > ×
-    """
     if df_ratings.empty:
         return pd.DataFrame()
 
@@ -457,11 +438,6 @@ def calculate_novel_status(df_ratings):
 
 @st.cache_data(ttl=900)
 def get_processed_novel_data(user_name):
-    """
-    表示用データの生成（キャッシュ化）
-    Fragmentのリラン時に高速に応答するために、重い処理（結合・計算）をキャッシュする。
-    評価更新時はこのキャッシュをクリアする。
-    """
     df_master = load_master_data()
     df_ratings = load_user_ratings(user_name)
     df_all_ratings_raw = load_all_ratings_table()
@@ -536,9 +512,6 @@ def get_processed_novel_data(user_name):
 
 
 def apply_local_patches(df, user_name):
-    """
-    キャッシュされたデータフレームに対し、ローカル（session_state）上の未反映パッチを適用する
-    """
     if "local_rating_patches" not in st.session_state or not st.session_state["local_rating_patches"]:
         return df
 
@@ -936,6 +909,10 @@ def render_novel_list(df_in, key_suffix):
             else:
                 display_df[col] = display_df[col].astype(str).apply(lambda x: x.split(" ")[0])
 
+    if "novelupdated_at" in display_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(display_df["novelupdated_at"]):
+            display_df["novelupdated_at"] = display_df["novelupdated_at"].dt.strftime('%Y-%m-%d %H:%M').fillna("-")
+
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(sortable=False)
     gb.configure_selection(selection_mode='single', use_checkbox=False)
@@ -1057,10 +1034,6 @@ def render_novel_list(df_in, key_suffix):
 # タブによるリスト切り替え
 # ==================================================
 def get_filtered_sorted_data(user_name, genre, filter_netcon14, search_keyword, exclude_keyword, min_global, max_global, sort_col, is_ascending, firstup_from=None, firstup_to=None, lastup_from=None, lastup_to=None):
-    """
-    フィルタリングとソートを行ったデータフレームを返す
-    get_processed_novel_data（キャッシュ） + ローカルパッチ適用
-    """
     df_base = get_processed_novel_data(user_name)
     
     df = apply_local_patches(df_base, user_name)
@@ -1102,8 +1075,6 @@ def get_filtered_sorted_data(user_name, genre, filter_netcon14, search_keyword, 
         
         if target_ncodes is not None:
             df = df[df["ncode"].isin(target_ncodes)]
-
-
 
     if min_global is not None and min_global > 0:
         df = df[df["global_point"] >= min_global]
