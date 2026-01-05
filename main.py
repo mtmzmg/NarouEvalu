@@ -625,7 +625,7 @@ with st.sidebar.expander("ヘルプ"):
     """, unsafe_allow_html=True)
 
 # エクスポート用：評価済み（ステータスあり）の作品だけを抽出して処理
-if st.sidebar.button("評価済みリストをCSV出力作成"):
+if st.sidebar.button("評価済みリストをCSV出力"):
     try:
         with st.spinner("CSV作成中..."):
             # DuckDBから評価済みデータを結合して取得
