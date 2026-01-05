@@ -113,26 +113,20 @@ def load_master_data():
         def cast_col(col):
             return f"TRY_CAST(REPLACE(CAST({col} AS VARCHAR), ',', '') AS BIGINT) AS {col}"
 
+        # 必要なカラムのみ抽出してメモリ削減
         query = f"""
             SELECT 
-                ncode, title, userid, writer, biggenre, genre, gensaku, keyword,
-                general_firstup, general_lastup, novel_type, "end", 
+                ncode, title, writer, genre, keyword,
+                general_firstup, general_lastup, 
                 {cast_col('general_all_no')},
-                length, "time", isstop, isr15, isbl, isgl, iszankoku, istensei, istenni,
+                length,
                 {cast_col('global_point')},
                 {cast_col('daily_point')},
                 {cast_col('weekly_point')},
                 {cast_col('monthly_point')},
-                {cast_col('quarter_point')},
-                {cast_col('yearly_point')},
                 {cast_col('fav_novel_cnt')},
-                {cast_col('impression_cnt')},
-                {cast_col('review_cnt')},
                 {cast_col('all_point')},
-                {cast_col('all_hyoka_cnt')},
-                {cast_col('sasie_cnt')},
-                {cast_col('kaiwaritu')},
-                novelupdated_at, updated_at,
+                novelupdated_at,
                 {cast_col('weekly_unique')}
             FROM read_parquet([{file_list_str}])
         """
@@ -151,17 +145,23 @@ def load_master_data():
         df["genre"] = df["genre"].astype(str).map(GENRE_MAP).fillna(df["genre"]).astype("category")
 
     numeric_cols = ["global_point", "daily_point", "weekly_point", "monthly_point", 
-                    "quarter_point", "yearly_point", "all_point", "general_all_no", 
-                    "weekly_unique", "fav_novel_cnt", "impression_cnt", "review_cnt", "sasie_cnt", "kaiwaritu"]
+                    "all_point", "general_all_no", 
+                    "weekly_unique", "fav_novel_cnt"]
     
-    df[numeric_cols] = df[numeric_cols].fillna(0)
+    # 存在しないカラムを除外してfillna
+    valid_numeric_cols = [c for c in numeric_cols if c in df.columns]
+    if valid_numeric_cols:
+        df[valid_numeric_cols] = df[valid_numeric_cols].fillna(0)
 
-    date_cols = ["general_firstup", "general_lastup", "novelupdated_at", "updated_at"]
+    date_cols = ["general_firstup", "general_lastup", "novelupdated_at"]
     for col in date_cols:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
 
     gc.collect()
+    
+    # 書き込み禁止（共有メモリ保護）
+    df.flags.writeable = False
 
     return df
 
@@ -936,43 +936,27 @@ def render_novel_list(df_in, key_suffix):
 
     gb.configure_column("ncode", header_name="Nコード", width=150, sortable=True)
     gb.configure_column("title", header_name="タイトル", width=670, wrapText=True, autoHeight=True, sortable=True)
-    gb.configure_column("userid", hide=True)
     gb.configure_column("writer", header_name="著者", width=150, sortable=True)
-    if "story" in display_df.columns:
-        gb.configure_column("story", hide=True)
-    gb.configure_column("biggenre", hide=True)
+    
     gb.configure_column("genre", header_name="ジャンル", width=170, sortable=True)
-    gb.configure_column("gensaku", hide=True)
     gb.configure_column("keyword", hide=True)
     gb.configure_column("general_firstup", header_name="初回掲載日", width=150, sortable=True)
     gb.configure_column("general_lastup", header_name="最終掲載日", width=150, sortable=True)
-    gb.configure_column("novel_type", hide=True)
-    gb.configure_column("end", hide=True)
+    
     gb.configure_column("general_all_no", header_name="話数", width=80, filter=False, sortable=True)
     gb.configure_column("length", hide=True)
-    gb.configure_column("time", hide=True)
-    gb.configure_column("isstop", hide=True)
-    gb.configure_column("isr15", hide=True)
-    gb.configure_column("isbl", hide=True)
-    gb.configure_column("isgl", hide=True)
-    gb.configure_column("iszankoku", hide=True)
-    gb.configure_column("istensei", hide=True)
-    gb.configure_column("istenni", hide=True)
+    
     gb.configure_column("global_point", header_name="総合評価ポイント", width=190, filter=False, sortable=True)
     gb.configure_column("daily_point", header_name="日間ポイント", width=150, filter=False, sortable=True)
     gb.configure_column("weekly_point", hide=True)
     gb.configure_column("monthly_point", hide=True)
-    gb.configure_column("quarter_point", hide=True)
-    gb.configure_column("yearly_point", hide=True)
+    
     gb.configure_column("fav_novel_cnt", hide=True)
-    gb.configure_column("impression_cnt", hide=True)
-    gb.configure_column("review_cnt", hide=True)
+    
     gb.configure_column("all_point", hide=True)
-    gb.configure_column("all_hyoka_cnt", hide=True)
-    gb.configure_column("sasie_cnt", hide=True)
-    gb.configure_column("kaiwaritu", hide=True)
+    
     gb.configure_column("novelupdated_at", header_name="作品の更新日時", width=220, sortable=True)
-    gb.configure_column("updated_at", hide=True)
+    
     gb.configure_column("weekly_unique", header_name="週間UU数", width=120, filter=False, sortable=True)
     gb.configure_column("classification", header_name="分類", hide=True)
     gb.configure_column("my_rating", header_name="評価（自）", width=120)
@@ -1395,7 +1379,7 @@ def main_content(user_name):
                 )
             
             with col_btn2:
-                btn_type = "primary" if current_my_rating == "△" else "保留"
+                btn_type = "primary" if current_my_rating == "△" else "secondary"
                 st.button(
                     "△ 保留", 
                     type=btn_type, 
