@@ -222,11 +222,12 @@ def search_ncodes_by_duckdb(search_keyword_str, exclude_keyword_str):
                     title ILIKE ? OR 
                     writer ILIKE ? OR 
                     story ILIKE ? OR 
-                    keyword ILIKE ?
+                    keyword ILIKE ? OR
+                    ncode ILIKE ?
                 )
             """)
             p = f"%{k}%"
-            params.extend([p, p, p, p])
+            params.extend([p, p, p, p, p])
 
     if exclude_keyword_str:
         ex_keywords = exclude_keyword_str.replace("　", " ").split()
@@ -236,11 +237,12 @@ def search_ncodes_by_duckdb(search_keyword_str, exclude_keyword_str):
                     title ILIKE ? OR 
                     writer ILIKE ? OR 
                     story ILIKE ? OR 
-                    keyword ILIKE ?
+                    keyword ILIKE ? OR
+                    ncode ILIKE ?
                 )
             """)
             p = f"%{k}%"
-            params.extend([p, p, p, p])
+            params.extend([p, p, p, p, p])
             
     full_query = " ".join(query_parts)
     
