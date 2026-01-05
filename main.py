@@ -597,8 +597,78 @@ st.sidebar.caption("※初回掲載日が2024年2月1日以降の作品のみ対
 # データエクスポート
 # ==================================================
 st.sidebar.markdown("---")
-# エクスポート機能は省略（DuckDB経由にするのが面倒なため一旦無効化、または必要なら実装）
-# 評価済みリストだけ出すなら、DBからSELECTすればよい。
+with st.sidebar.expander("ヘルプ"):
+    st.markdown("""
+    <div style="font-size: 0.85rem; color: #555;">
+    <b>初回掲載日</b><br>
+    1エピソード目の投稿日<br><br>
+    <b>最終掲載日</b><br>
+    最新エピソードの投稿日<br><br>
+    <b>総合評価pt</b><br>
+    ＝(ブックマーク数*2)+評価ポイント<br><br>
+    <b>日間ポイント</b><br>
+    ランキング集計時点から過去24時間以内で新たに登録されたブックマークや評価が対象。毎日3回程度更新。<br><br>
+    <b>週間UU数</b><br>
+    前週の日曜日から土曜日分のユニークの合計。毎週火曜日早朝に更新。<br><br>
+    <b>データ更新</b><br>
+    毎朝6:30～7:00頃。<br><br>
+    <hr>
+    <b>評価優先順位</b><br>
+    原作管理チーム、一般編集問わず、評価の中にNGがある場合はNGに振り分け。<br>
+    <br>
+    原作管理チームの中で○と△と×で評価が混在する場合、よりポジティブな評価を優先して振り分けされる。<br>
+    ○＞△＞×<br>
+    <br>
+    一般編集の中で○と△と×で評価が混在する場合、よりポジティブな評価を優先して振り分けされる。<br>
+    ○＞△＞×
+    </div>
+    """, unsafe_allow_html=True)
+
+# エクスポート用：評価済み（ステータスあり）の作品だけを抽出して処理
+if st.sidebar.button("評価済みリストをCSV準備"):
+    try:
+        # DuckDBから評価済みデータを結合して取得
+        export_query = """
+            SELECT 
+                t1.ncode as "Nコード",
+                t1.title as "タイトル",
+                t1.writer as "著者名",
+                t1.genre as "ジャンル",
+                strftime(t1.general_firstup, '%Y-%m-%d') as "初回掲載日",
+                strftime(t1.general_lastup, '%Y-%m-%d') as "最終掲載日",
+                t1.general_all_no as "話数",
+                t1.length as "文字数",
+                t1.global_point as "総合評価ポイント",
+                GROUP_CONCAT(t3.user_name || '：' || t3.rating, '、') as "評価",
+                GROUP_CONCAT(t3.user_name || '：' || t3.comment, '、') as "コメント"
+            FROM master_novels t1
+            JOIN user_ratings_raw t3 ON t1.ncode = t3.ncode
+            WHERE t3.rating IS NOT NULL AND t3.rating != ''
+            GROUP BY 
+                t1.ncode, t1.title, t1.writer, t1.genre, 
+                t1.general_firstup, t1.general_lastup, 
+                t1.general_all_no, t1.length, t1.global_point
+            ORDER BY t1.ncode
+        """
+        df_export = conn.execute(export_query).df()
+        
+        if not df_export.empty:
+            # ジャンルID変換
+            df_export["ジャンル"] = df_export["ジャンル"].astype(str).map(GENRE_MAP).fillna(df_export["ジャンル"])
+            
+            csv_str = df_export.to_csv(index=False)
+            csv_bytes = csv_str.encode('utf-8-sig')
+
+            st.sidebar.download_button(
+                label="評価済みリストをCSV出力",
+                data=csv_bytes,
+                file_name=f"reviewed_novels_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.sidebar.warning("評価済みの作品はありません")
+    except Exception as e:
+        st.sidebar.error(f"エクスポートエラー: {e}")
 
 # ==================================================
 # リスト表示関数
