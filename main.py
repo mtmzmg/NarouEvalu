@@ -15,7 +15,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 # ==================================================
 pd.set_option('future.no_silent_downcasting', True)
 
-# 非同期実行用のスレッドプール（リソースとしてキャッシュし、再実行時の増殖を防ぐ）
 @st.cache_resource
 def get_thread_pool():
     return concurrent.futures.ThreadPoolExecutor(max_workers=5)
