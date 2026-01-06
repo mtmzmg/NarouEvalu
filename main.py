@@ -178,27 +178,29 @@ def load_novel_story(ncode):
     except Exception as e:
         return f"あらすじ取得エラー: {str(e)}"
 
-@st.cache_data(ttl=300)
 def load_user_ratings(user_name):
+    # ユーザー個人の評価データも軽量なのでキャッシュせず常に最新を取得（整合性重視）
     res = (
         supabase.table("user_ratings")
-        .select("*")
+        .select("ncode,user_name,rating,comment,role,updated_at")
         .eq("user_name", user_name)
         .execute()
     )
     return pd.DataFrame(res.data)
 
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=120)
 def load_all_ratings_table():
-    res = supabase.table("user_ratings").select("*").execute()
+    # 一覧表示用：頻繁すぎると重くなるため3分キャッシュ。
+    # ※自分の評価はlocal_rating_patchesで即時反映されるため、操作感は損なわれません。
+    res = supabase.table("user_ratings").select("ncode,user_name,rating,comment,role,updated_at").execute()
     return pd.DataFrame(res.data)
 
-@st.cache_data(ttl=900)
 def load_novel_ratings_all(ncode):
     try:
+        # 単一作品の取得は高速なのでキャッシュせず常に最新を取得
         res = (
             supabase.table("user_ratings")
-            .select("*")
+            .select("user_name,rating,comment,role,updated_at")
             .eq("ncode", ncode)
             .execute()
         )
