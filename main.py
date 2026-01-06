@@ -5,6 +5,7 @@ import os
 import duckdb
 import glob
 import gc
+import concurrent.futures
 from datetime import datetime, timedelta, timezone
 from supabase import create_client
 from st_aggrid import AgGrid, GridOptionsBuilder
@@ -13,6 +14,9 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 # 定数定義
 # ==================================================
 pd.set_option('future.no_silent_downcasting', True)
+
+# 非同期実行用のスレッドプール
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 try:
     auth_config = st.secrets["auth"]
@@ -217,7 +221,14 @@ def save_rating(ncode, user_name, rating, comment, role):
         "updated_at": get_jst_now()
     }
     
-    supabase.table("user_ratings").upsert(data, on_conflict="ncode,user_name").execute()
+    # UIのレスポンスを優先するため、保存はバックグラウンド（ThreadPool）で実行
+    def _write_to_supabase():
+        try:
+            supabase.table("user_ratings").upsert(data, on_conflict="ncode,user_name").execute()
+        except Exception as e:
+            print(f"Error saving rating: {e}")
+
+    executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
@@ -255,7 +266,14 @@ def save_comment_only(ncode, user_name, comment, role):
         "updated_at": get_jst_now()
     }
     
-    supabase.table("user_ratings").upsert(data, on_conflict="ncode,user_name").execute()
+    # UIのレスポンスを優先するため、保存はバックグラウンド（ThreadPool）で実行
+    def _write_to_supabase():
+        try:
+            supabase.table("user_ratings").upsert(data, on_conflict="ncode,user_name").execute()
+        except Exception as e:
+            print(f"Error saving comment: {e}")
+
+    executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
