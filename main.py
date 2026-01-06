@@ -773,7 +773,7 @@ def render_novel_list(df_in, total_count, key_suffix, page, page_size):
             def prev_page():
                 st.session_state[f"current_page_{key_suffix}"] -= 1
             
-            st.button("前", key=f"prev_{key_suffix}", disabled=(page <= 1), use_container_width=True, on_click=prev_page)
+            st.button("前", key=f"prev_{key_suffix}", disabled=(page <= 1), width='stretch', on_click=prev_page)
 
         with col_page:
             st.markdown(
@@ -785,7 +785,7 @@ def render_novel_list(df_in, total_count, key_suffix, page, page_size):
             def next_page():
                 st.session_state[f"current_page_{key_suffix}"] += 1
 
-            st.button("次", key=f"next_{key_suffix}", disabled=(page >= total_pages), use_container_width=True, on_click=next_page)
+            st.button("次", key=f"next_{key_suffix}", disabled=(page >= total_pages), width='stretch', on_click=next_page)
 
     selected = grid_response['selected_rows']
     if selected is not None and len(selected) > 0:
@@ -1200,7 +1200,7 @@ def main_content(user_name):
                 st.button(
                     "○ 面白い／コミカライズし易そう", 
                     type=btn_type, 
-                    use_container_width=True, 
+                    width='stretch', 
                     key="btn_good",
                     on_click=on_rating_button_click,
                     args=(row['ncode'], user_name, "〇", current_my_rating, role)
@@ -1211,7 +1211,7 @@ def main_content(user_name):
                 st.button(
                     "△ 保留", 
                     type=btn_type, 
-                    use_container_width=True, 
+                    width='stretch', 
                     key="btn_hold",
                     on_click=on_rating_button_click,
                     args=(row['ncode'], user_name, "△", current_my_rating, role)
@@ -1222,7 +1222,7 @@ def main_content(user_name):
                 st.button(
                     "× 面白くない／しづらそう", 
                     type=btn_type, 
-                    use_container_width=True, 
+                    width='stretch', 
                     key="btn_bad",
                     on_click=on_rating_button_click,
                     args=(row['ncode'], user_name, "×", current_my_rating, role)
@@ -1235,7 +1235,7 @@ def main_content(user_name):
                 st.button(
                     ng_label, 
                     type=btn_type, 
-                    use_container_width=True, 
+                    width='stretch', 
                     key="btn_ng",
                     on_click=on_rating_button_click,
                     args=(row['ncode'], user_name, "NG", current_my_rating, role)
@@ -1319,7 +1319,7 @@ def main_content(user_name):
                     st.dataframe(
                         disp_ratings, 
                         hide_index=True, 
-                        use_container_width=True, 
+                        width='stretch', 
                         column_config={
                             "名前": st.column_config.TextColumn(width="small"),
                             "評価": st.column_config.TextColumn(width="small"),
