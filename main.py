@@ -195,7 +195,7 @@ def load_user_ratings(user_name):
     )
     return pd.DataFrame(res.data)
 
-@st.cache_data(ttl=120, max_entries=1)
+@st.cache_data(ttl=180, max_entries=1)
 def load_all_ratings_table():
     res = supabase.table("user_ratings").select("ncode,user_name,rating,comment,role,updated_at").execute()
     return pd.DataFrame(res.data)
