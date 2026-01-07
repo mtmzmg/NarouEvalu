@@ -1208,80 +1208,148 @@ def main_content(user_name):
         
         role = "原作管理チーム" if user_name in ADMIN_TEAM_USERS else "一般編集"
 
-        col_btn1, col_btn2 = st.columns(2)
-        col_btn3, col_btn4 = st.columns(2)
-
-        # フラグメント内での再描画時に、st.session_state["local_rating_patches"] から
-        # 最新の評価状態を取得してボタンの色に反映させる
-        current_my_rating = row.get("my_rating")
-        if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
-             current_my_rating = st.session_state["local_rating_patches"][row['ncode']]["rating"]
-
-        if pd.isna(current_my_rating):
-            current_my_rating = None
-
-        with col_btn1:
-            btn_type = "primary" if current_my_rating == "〇" else "secondary"
-            st.button(
-                "○ 面白い／コミカライズし易そう", 
-                type=btn_type, 
-                width='stretch', 
-                key=f"btn_good_{row['ncode']}", # キーをユニークに
-                on_click=on_rating_button_click,
-                args=(row['ncode'], user_name, "〇", current_my_rating, role)
-            )
+        # ----------------------------------------------------
+        # 画面構成: 2カラム (左:ボタン群, 右:あらすじ+評価一覧)
+        # ----------------------------------------------------
+        # メイン側ですでに col_left, col_right に分けているので
+        # ここでは評価ボタン周辺だけを管理するか、
+        # あるいは Fragment 内で再度レイアウトを切る必要がある。
+        # 
+        # シンプルにするため、「ボタン」と「評価一覧」を横並びでここで描画する形に変更。
+        # 親側（main_content）の col_left, col_right の構造を変える必要があるが、
+        # Fragmentは「一塊」として扱われるため、Fragment内部で左右に分ける。
         
-        with col_btn2:
-            btn_type = "primary" if current_my_rating == "△" else "secondary"
-            st.button(
-                "△ 保留", 
-                type=btn_type, 
-                width='stretch', 
-                key=f"btn_hold_{row['ncode']}", # キーをユニークに
-                on_click=on_rating_button_click,
-                args=(row['ncode'], user_name, "△", current_my_rating, role)
-            )
+        col_fragment_left, col_fragment_right = st.columns([1, 2], gap="large")
 
-        with col_btn3:
-            btn_type = "primary" if current_my_rating == "×" else "secondary"
-            st.button(
-                "× 面白くない／しづらそう", 
-                type=btn_type, 
-                width='stretch', 
-                key=f"btn_bad_{row['ncode']}", # キーをユニークに
-                on_click=on_rating_button_click,
-                args=(row['ncode'], user_name, "×", current_my_rating, role)
-            )
-
-        with col_btn4:
-            ng_label = "NG（商業化済み／原作管理判定）" if role == "原作管理チーム" else "NG（商業化済み）"
+        # === 左カラム：ボタンとコメント入力 ===
+        with col_fragment_left:
             
-            btn_type = "primary" if current_my_rating == "NG" else "secondary"
-            st.button(
-                ng_label, 
-                type=btn_type, 
-                width='stretch', 
-                key=f"btn_ng_{row['ncode']}", # キーをユニークに
-                on_click=on_rating_button_click,
-                args=(row['ncode'], user_name, "NG", current_my_rating, role)
-            )
+            # --- 情報表示（ジャンルなど）は再描画不要だがレイアウト上ここに含める ---
+            st.markdown(f"""
+            <div style="margin-bottom: 10px;">
+                <div class="label">ジャンル</div>
+                <div class="value" style="color: #3498db; font-size: 1rem;">{row.get('genre', '-')}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        def on_comment_change():
-            new_comment = st.session_state[f"input_comment_area_{row['ncode']}"]
-            role_tmp = "原作管理チーム" if user_name in ADMIN_TEAM_USERS else "一般編集"
-            save_comment_only(row['ncode'], user_name, new_comment, role_tmp)
+            st.markdown(f"""
+            <div style="margin-bottom: 20px;">
+                <div class="label">タグ</div>
+                <div style="font-size: 0.85rem; color: #666; line-height: 1.4;">{row.get('keyword', '-')}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # コメントもフラグメント内で最新のパッチ状態を見る
-        if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
-             initial_comment = st.session_state["local_rating_patches"][row['ncode']]["comment"]
+            c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2], gap="small")
+            with c1:
+                st.markdown(f"""<div class="label">総合評価</div><div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('global_point'), 'pt')}</div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class="label">エピソード数</div><div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('general_all_no'), '話')}</div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div class="label">文字数</div><div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('length'), '文字')}</div>""", unsafe_allow_html=True)
+            with c4:
+                with st.expander("その他統計"):
+                    st.markdown(f"""
+                    <div style="font-size: 0.8rem; line-height: 1.6; color: #555;">
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>評価</span><b>{fmt_num(row.get('all_point'))}</b></div>
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>Bookmark</span><b>{fmt_num(row.get('fav_novel_cnt'))}</b></div>
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>日間pt</span><b>{fmt_num(row.get('daily_point'))}</b></div>
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>週間pt</span><b>{fmt_num(row.get('weekly_point'))}</b></div>
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>月間pt</span><b>{fmt_num(row.get('monthly_point'))}</b></div>
+                        <div style="display:flex; justify-content:space-between;"><span>週間UU</span><b>{fmt_num(row.get('weekly_unique'))}</b></div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        input_comment = st.text_area(
-            "コメント", 
-            value=initial_comment, 
-            height=100, 
-            key=f"input_comment_area_{row['ncode']}",
-            on_change=on_comment_change
-        )
+            st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="label">評価アクション</div>', unsafe_allow_html=True)
+
+            # 最新の評価状態を取得
+            current_my_rating = row.get("my_rating")
+            if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
+                 current_my_rating = st.session_state["local_rating_patches"][row['ncode']]["rating"]
+            if pd.isna(current_my_rating): current_my_rating = None
+
+            col_btn1, col_btn2 = st.columns(2)
+            col_btn3, col_btn4 = st.columns(2)
+
+            with col_btn1:
+                btn_type = "primary" if current_my_rating == "〇" else "secondary"
+                st.button("○ 面白い／コミカライズし易そう", type=btn_type, width='stretch', key=f"btn_good_{row['ncode']}", on_click=on_rating_button_click, args=(row['ncode'], user_name, "〇", current_my_rating, role))
+            with col_btn2:
+                btn_type = "primary" if current_my_rating == "△" else "secondary"
+                st.button("△ 保留", type=btn_type, width='stretch', key=f"btn_hold_{row['ncode']}", on_click=on_rating_button_click, args=(row['ncode'], user_name, "△", current_my_rating, role))
+            with col_btn3:
+                btn_type = "primary" if current_my_rating == "×" else "secondary"
+                st.button("× 面白くない／しづらそう", type=btn_type, width='stretch', key=f"btn_bad_{row['ncode']}", on_click=on_rating_button_click, args=(row['ncode'], user_name, "×", current_my_rating, role))
+            with col_btn4:
+                ng_label = "NG（商業化済み／原作管理判定）" if role == "原作管理チーム" else "NG（商業化済み）"
+                btn_type = "primary" if current_my_rating == "NG" else "secondary"
+                st.button(ng_label, type=btn_type, width='stretch', key=f"btn_ng_{row['ncode']}", on_click=on_rating_button_click, args=(row['ncode'], user_name, "NG", current_my_rating, role))
+
+            def on_comment_change():
+                new_comment = st.session_state[f"input_comment_area_{row['ncode']}"]
+                role_tmp = "原作管理チーム" if user_name in ADMIN_TEAM_USERS else "一般編集"
+                save_comment_only(row['ncode'], user_name, new_comment, role_tmp)
+
+            if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
+                 initial_comment = st.session_state["local_rating_patches"][row['ncode']]["comment"]
+
+            st.text_area("コメント", value=initial_comment, height=100, key=f"input_comment_area_{row['ncode']}", on_change=on_comment_change)
+
+
+        # === 右カラム：あらすじと評価一覧 ===
+        with col_fragment_right:
+            st.markdown('<div class="label" style="margin-bottom: 8px;">あらすじ</div>', unsafe_allow_html=True)
+            story_text = load_novel_story(row['ncode'])
+            st.markdown(f"""<div class="story-box" style="margin-bottom: 30px;">{story_text.replace('\n', '<br>')}</div>""", unsafe_allow_html=True)
+
+            st.subheader("評価者一覧")
+            
+            # 再描画時にデータを再取得することで、自分の最新評価も反映される
+            other_ratings_df = load_novel_ratings_all(row['ncode'])
+
+            if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
+                patch = st.session_state["local_rating_patches"][row['ncode']]
+                new_row = {
+                    "ncode": row['ncode'], "user_name": user_name,
+                    "rating": patch["rating"], "comment": patch["comment"],
+                    "role": patch["role"], "updated_at": patch["updated_at"]
+                }
+                if other_ratings_df.empty:
+                    other_ratings_df = pd.DataFrame([new_row])
+                else:
+                    my_idx = other_ratings_df[other_ratings_df["user_name"] == user_name].index
+                    if not my_idx.empty:
+                        for k, v in new_row.items(): other_ratings_df.loc[my_idx, k] = v
+                    else:
+                        other_ratings_df = pd.concat([other_ratings_df, pd.DataFrame([new_row])], ignore_index=True)
+
+            if not other_ratings_df.empty:
+                r_check = other_ratings_df["rating"].fillna("").astype(str).str.strip().replace("None", "")
+                c_check = other_ratings_df["comment"].fillna("").astype(str).str.strip().replace("None", "")
+                disp_ratings = other_ratings_df[(r_check != "") | (c_check != "")].copy()
+                
+                if disp_ratings.empty:
+                    st.info("まだ評価はありません")
+                else:
+                    if 'updated_at' in disp_ratings.columns:
+                        disp_ratings['updated_at'] = pd.to_datetime(disp_ratings['updated_at'], utc=True, errors='coerce').dt.tz_convert('Asia/Tokyo').dt.strftime('%Y-%m-%d %H:%M')
+                    
+                    target_cols = ['user_name', 'rating', 'comment', 'updated_at']
+                    disp_ratings = disp_ratings[[c for c in target_cols if c in disp_ratings.columns]]
+                    rename_map = {'user_name': '名前', 'rating': '評価', 'comment': 'コメント', 'updated_at': '日時'}
+                    disp_ratings = disp_ratings.rename(columns=rename_map)
+
+                    st.dataframe(
+                        disp_ratings, hide_index=True, width='stretch', 
+                        column_config={
+                            "名前": st.column_config.TextColumn(width="small"),
+                            "評価": st.column_config.TextColumn(width="small"),
+                            "コメント": st.column_config.TextColumn(width="large"),
+                            "日時": st.column_config.TextColumn(width="small"),
+                        }
+                    )
+            else:
+                st.info("まだ評価はありません")
 
 
     with st.container(border=True):
@@ -1319,69 +1387,8 @@ def main_content(user_name):
         <hr style="border: 0; border-top: 2px solid #f0f2f6; margin: 20px 0;">
         """, unsafe_allow_html=True)
 
-
-
-        col_left, col_right = st.columns([1, 2], gap="large")
-
-        with col_left:
-            st.markdown(f"""
-            <div style="margin-bottom: 10px;">
-                <div class="label">ジャンル</div>
-                <div class="value" style="color: #3498db; font-size: 1rem;">{row.get('genre', '-')}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.markdown(f"""
-            <div style="margin-bottom: 20px;">
-                <div class="label">タグ</div>
-                <div style="font-size: 0.85rem; color: #666; line-height: 1.4;">{row.get('keyword', '-')}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2], gap="small")
-
-            with c1:
-                st.markdown(f"""
-                <div class="label">総合評価</div>
-                <div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('global_point'), 'pt')}</div>
-                """, unsafe_allow_html=True)
-                
-            with c2:
-                st.markdown(f"""
-                <div class="label">エピソード数</div>
-                <div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('general_all_no'), '話')}</div>
-                """, unsafe_allow_html=True)
-
-            with c3:
-                st.markdown(f"""
-                <div class="label">文字数</div>
-                <div class="value" style="font-size: 1.0rem; margin-bottom: 10px;">{fmt_num(row.get('length'), '文字')}</div>
-                """, unsafe_allow_html=True)
-
-            with c4:
-                with st.expander("その他統計"):
-                    st.markdown(f"""
-                    <div style="font-size: 0.8rem; line-height: 1.6; color: #555;">
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>評価</span><b>{fmt_num(row.get('all_point'))}</b></div>
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>Bookmark</span><b>{fmt_num(row.get('fav_novel_cnt'))}</b></div>
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>日間pt</span><b>{fmt_num(row.get('daily_point'))}</b></div>
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>週間pt</span><b>{fmt_num(row.get('weekly_point'))}</b></div>
-                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee;"><span>月間pt</span><b>{fmt_num(row.get('monthly_point'))}</b></div>
-                        <div style="display:flex; justify-content:space-between;"><span>週間UU</span><b>{fmt_num(row.get('weekly_unique'))}</b></div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            st.markdown(f"""
-            <div style="margin-bottom: 10px;">
-            """, unsafe_allow_html=True)
-            
-            st.markdown('<div class="label">評価アクション</div>', unsafe_allow_html=True)
-            
-            # ここでFragmentを呼び出し
-            render_rating_area(row, user_name)
-
-        with col_right:
-
+        # Fragment呼び出し（左右カラムのレイアウト定義も内部に移動したため、引数で渡したrowを使う）
+        render_rating_area(row, user_name)
             st.markdown('<div class="label" style="margin-bottom: 8px;">あらすじ</div>', unsafe_allow_html=True)
             
             story_text = load_novel_story(row['ncode'])
