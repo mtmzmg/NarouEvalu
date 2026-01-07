@@ -681,7 +681,7 @@ if st.sidebar.button("評価済みリストをExcel出力"):
                     t1.ncode, t1.title, t1.writer, t1.genre, 
                     t1.general_firstup, t1.general_lastup, 
                     t1.general_all_no, t1.length, t1.global_point
-                ORDER BY MAX(try_cast(t3.updated_at as TIMESTAMP)) DESC
+                ORDER BY MAX(try_cast(t3.updated_at as TIMESTAMP)) ASC
             """
             df_export = conn.execute(export_query).df()
             
