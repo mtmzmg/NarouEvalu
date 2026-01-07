@@ -394,7 +394,6 @@ def apply_local_patches(df, user_name):
     df_patched.set_index("ncode", drop=False, inplace=True)
     
     df_all_ratings = load_all_ratings_table()
-    # 高速化: 評価データもインデックス化
     if not df_all_ratings.empty and "ncode" in df_all_ratings.columns:
          df_all_ratings_indexed = df_all_ratings.set_index("ncode", drop=False)
     else:
@@ -664,7 +663,11 @@ with st.sidebar.expander("ヘルプ"):
 # エクスポート用：評価済み（ステータスあり）の作品だけを抽出して処理
 if st.sidebar.button("評価済みリストをExcel出力"):
     try:
-        with st.spinner("Excel作成中..."):
+        with st.spinner("最新データを取得してExcel作成中..."):
+            # キャッシュをクリアして最新の評価データを同期
+            st.cache_data.clear()
+            sync_ratings_to_db(conn)
+
             # DuckDBから評価済みデータを結合して取得
             export_query = """
                 SELECT 
