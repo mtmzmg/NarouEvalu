@@ -1352,43 +1352,8 @@ def main_content(user_name):
                 st.info("まだ評価はありません")
 
 
-    with st.container(border=True):
-        st.markdown(f"## {row['title']}")
-        
-        narou_url = f"https://ncode.syosetu.com/{row['ncode'].lower()}/"
-        google_url = f"https://www.google.com/search?q={row['title']}"
-
-        st.markdown(f"""
-        <div style="margin-bottom: 5px;">
-            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <div style="color: #666; font-size: 0.9rem;">
-                    著者: <b>{row.get('writer', '不明')}</b>
-                    <span style="margin: 0 8px; color: #ddd;">|</span>
-                    Nコード: {row['ncode']}
-                    <span style="margin: 0 8px; color: #ddd;">|</span>
-                    初回掲載日: {str(row.get('general_firstup', '-')).split(' ')[0]}
-                    <span style="margin: 0 8px;"></span>
-                    最終掲載日: {str(row.get('general_lastup', '-')).split(' ')[0]}
-                </div>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <a href="{narou_url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
-                    <div style="display: inline-flex; align-items: center; padding: 4px 12px; background-color: #eef2f6; border-radius: 15px; color: #2c3e50; font-size: 0.8rem; font-weight: 500; border: 1px solid #dae1e7; transition: all 0.2s;">
-                        本文を読む
-                    </div>
-                </a>
-                <a href="{google_url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
-                    <div style="display: inline-flex; align-items: center; padding: 4px 12px; background-color: #fff; border-radius: 15px; color: #5f6368; font-size: 0.8rem; font-weight: 500; border: 1px solid #dae1e7; transition: all 0.2s;">
-                        Google
-                    </div>
-                </a>
-            </div>
-        </div>
-        <hr style="border: 0; border-top: 2px solid #f0f2f6; margin: 20px 0;">
-        """, unsafe_allow_html=True)
-
-        # Fragment呼び出し（左右カラムのレイアウト定義も内部に移動したため、引数で渡したrowを使う）
-        render_rating_area(row, user_name)
+    # Fragment呼び出し（UI全体をFragment内で描画）
+    render_rating_area(row, user_name)
 
     st.write("")        
 
