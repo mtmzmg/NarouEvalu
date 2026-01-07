@@ -234,7 +234,6 @@ def save_rating(ncode, user_name, rating, comment, role):
         except Exception as e:
             print(f"Error saving rating: {e}")
 
-    # バックグラウンド実行（UIブロック回避）
     executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
@@ -279,7 +278,6 @@ def save_comment_only(ncode, user_name, comment, role):
         except Exception as e:
             print(f"Error saving comment: {e}")
 
-    # バックグラウンド実行（UIブロック回避）
     executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
@@ -406,19 +404,17 @@ def apply_local_patches(df, user_name):
         if ncode not in df_patched.index:
             continue
             
-        # パッチ適用
         df_patched.loc[ncode, "my_rating"] = patch["rating"]
         df_patched.loc[ncode, "my_comment"] = patch["comment"]
         
-        # ステータス再計算用のデータ取得（高速化版）
         novel_ratings = pd.DataFrame()
         if not df_all_ratings_indexed.empty and ncode in df_all_ratings_indexed.index:
-            # loc[]で返るのがSeriesかDataFrameか不定なので統一
             res = df_all_ratings_indexed.loc[[ncode]]
             novel_ratings = res.copy()
         
-        # 自分の新しい評価情報を反映
-        my_row_idx = novel_ratings[novel_ratings["user_name"] == user_name].index
+        my_row_idx = pd.Index([])
+        if "user_name" in novel_ratings.columns:
+            my_row_idx = novel_ratings[novel_ratings["user_name"] == user_name].index
         
         new_row = {
             "ncode": ncode,
@@ -433,11 +429,13 @@ def apply_local_patches(df, user_name):
             for k, v in new_row.items():
                 novel_ratings.loc[my_row_idx, k] = v
         else:
-            novel_ratings = pd.concat([novel_ratings, pd.DataFrame([new_row])], ignore_index=True)
+            if novel_ratings.empty:
+                 novel_ratings = pd.DataFrame([new_row])
+            else:
+                 novel_ratings = pd.concat([novel_ratings, pd.DataFrame([new_row])], ignore_index=True)
             
         flags = determine_status(novel_ratings)
         
-        # ステータス更新
         for flag_name, flag_val in flags.items():
             df_patched.loc[ncode, flag_name] = flag_val
         
@@ -449,9 +447,6 @@ def apply_local_patches(df, user_name):
             if row["is_general_rejected"]: return "Gen×"
             return "-"
         
-        # applyは行ごとなので、単一行に対して呼び出し
-        # df_patched.loc[ncode] はSeriesになるので、一度DataFrameにしてからapplyするか、直接判定する
-        # ここでは既存ロジックを維持するため Series を渡す形に
         target_row = df_patched.loc[ncode]
         classification = get_disp_status_single(target_row)
         df_patched.loc[ncode, "classification"] = classification
