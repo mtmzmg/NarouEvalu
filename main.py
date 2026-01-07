@@ -233,7 +233,7 @@ def save_rating(ncode, user_name, rating, comment, role):
         except Exception as e:
             print(f"Error saving rating: {e}")
 
-    executor.submit(_write_to_supabase)
+    _write_to_supabase()
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
@@ -277,7 +277,7 @@ def save_comment_only(ncode, user_name, comment, role):
         except Exception as e:
             print(f"Error saving comment: {e}")
 
-    executor.submit(_write_to_supabase)
+    _write_to_supabase()
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
@@ -523,15 +523,12 @@ st.markdown("""
 
 st.title("なろう小説 ダッシュボード")
 
-# DB接続
 conn = get_db_connection()
 if not conn:
     st.stop()
     
-# データ同期
 sync_status = sync_ratings_to_db(conn)
 if sync_status:
-    # st.caption(f"DB同期完了: {sync_status}")
     pass
 
 st.session_state["data_loaded"] = True
@@ -575,9 +572,8 @@ else:
 st.sidebar.header("絞り込み")
 
 genres = ["すべて"]
-# DuckDBからジャンル一覧を取るのもありだが、固定リストを使用
 sorted_genres = []
-existing_genres = set(GENRE_MAP.values()) # 簡易的にMAP全値を使う
+existing_genres = set(GENRE_MAP.values())
 sorted_genres = sorted(list(existing_genres))
 genres += sorted_genres
 
@@ -648,11 +644,9 @@ with st.sidebar.expander("ヘルプ"):
     </div>
     """, unsafe_allow_html=True)
 
-# エクスポート用：評価済み（ステータスあり）の作品だけを抽出して処理
 if st.sidebar.button("評価済みリストをCSV出力"):
     try:
         with st.spinner("CSV作成中..."):
-            # DuckDBから評価済みデータを結合して取得
             export_query = """
                 SELECT 
                     t1.ncode as "Nコード",
@@ -688,13 +682,11 @@ if st.sidebar.button("評価済みリストをCSV出力"):
             df_export = conn.execute(export_query).df()
             
             if not df_export.empty:
-                # ジャンルID変換
                 df_export["ジャンル"] = df_export["ジャンル"].astype(str).map(GENRE_MAP).fillna(df_export["ジャンル"])
                 
                 csv_str = df_export.to_csv(index=False)
                 csv_bytes = csv_str.encode('utf-8-sig')
                 
-                # session_stateに保存して再描画時も保持
                 st.session_state["export_csv"] = csv_bytes
                 st.session_state["export_time"] = datetime.now().strftime('%Y%m%d_%H%M%S')
             else:
@@ -717,9 +709,6 @@ if "export_csv" in st.session_state:
 # リスト表示関数
 # ==================================================
 def render_novel_list(df_in, total_count, key_suffix, page, page_size):
-    # df_in はすでにページングされた結果 (最大300件)
-    
-    # 日付フォーマット調整
     for col in ["general_firstup", "general_lastup"]:
         if col in df_in.columns:
             if pd.api.types.is_datetime64_any_dtype(df_in[col]):
@@ -779,7 +768,6 @@ def render_novel_list(df_in, total_count, key_suffix, page, page_size):
         key=f'aggrid_{key_suffix}'
     )
 
-    # ページネーションコントロール
     total_pages = (total_count // page_size) + (1 if total_count % page_size > 0 else 0)
     start_idx = (page - 1) * page_size
     
@@ -790,7 +778,6 @@ def render_novel_list(df_in, total_count, key_suffix, page, page_size):
             st.caption(f"全 {total_count} 件中 {start_idx + 1} - {min(start_idx + page_size, total_count)} 件")
 
         with col_size:
-            # size_key = f"page_size_{key_suffix}" # session_stateはmain_contentで管理
             pass 
 
         with col_prev:
@@ -1043,7 +1030,6 @@ def main_content(user_name):
         key="selected_tab_nav"
     )
 
-    # キー作成
     key_suffix = "all"
     if current_tab == "未評価": key_suffix = "unclassified"
     elif current_tab == "○／△（原作管理）": key_suffix = "evaluated_team"
@@ -1052,15 +1038,13 @@ def main_content(user_name):
     elif current_tab == "×（一般編集）": key_suffix = "rejected_edit"
     elif current_tab == "NG（商業化済み／原作管理判定）": key_suffix = "ng_commercialized"
 
-    # ページング状態
     page_key = f"current_page_{key_suffix}"
     if page_key not in st.session_state:
         st.session_state[page_key] = 1
         
     page = st.session_state[page_key]
-    page_size = 300 # 固定
+    page_size = 300 
 
-    # データ取得
     df, total_count = execute_search_query(
         conn,
         user_name, 
@@ -1081,7 +1065,6 @@ def main_content(user_name):
         page_size
     )
     
-    # ローカルパッチ適用
     df = apply_local_patches(df, user_name)
 
     selected_ncode = render_novel_list(df, total_count, key_suffix, page, page_size)
@@ -1094,11 +1077,12 @@ def main_content(user_name):
         st.info("作品を一覧から選択してください")
         return
 
-    # 詳細表示のために再度取得、あるいは df から取得
-    # df に含まれているはず
+    if df.empty or "ncode" not in df.columns:
+        st.error("表示するデータがありません")
+        return
+
     row_df = df[df["ncode"] == selected_ncode]
     if row_df.empty:
-        # ページ遷移などで消えた場合、別途取得するかエラー
         st.error("データが見つかりません")
         return
 
@@ -1121,9 +1105,7 @@ def main_content(user_name):
         
         role = "原作管理チーム" if user_name in ADMIN_TEAM_USERS else "一般編集"
 
-        # 詳細画面全体を一つの枠で囲む
         with st.container(border=True):
-            # === ヘッダー部：タイトル、著者、リンク ===
             st.markdown(f"## {row['title']}")
             
             narou_url = f"https://ncode.syosetu.com/{row['ncode'].lower()}/"
@@ -1159,13 +1141,10 @@ def main_content(user_name):
             """, unsafe_allow_html=True)
 
 
-            # === 2カラムレイアウト ===
             col_fragment_left, col_fragment_right = st.columns([1, 2], gap="large")
 
-            # === 左カラム：作品統計、ボタン、コメント ===
             with col_fragment_left:
                 
-                # ジャンル・タグ・統計
                 st.markdown(f"""
                 <div style="margin-bottom: 10px;">
                     <div class="label">ジャンル</div>
@@ -1203,13 +1182,11 @@ def main_content(user_name):
                 st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
                 st.markdown('<div class="label">評価アクション</div>', unsafe_allow_html=True)
 
-                # 最新の評価状態を取得
                 current_my_rating = row.get("my_rating")
                 if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
                      current_my_rating = st.session_state["local_rating_patches"][row['ncode']]["rating"]
                 if pd.isna(current_my_rating): current_my_rating = None
 
-                # 評価ボタン
                 col_btn1, col_btn2 = st.columns(2)
                 col_btn3, col_btn4 = st.columns(2)
 
@@ -1227,7 +1204,6 @@ def main_content(user_name):
                     btn_type = "primary" if current_my_rating == "NG" else "secondary"
                     st.button(ng_label, type=btn_type, width='stretch', key=f"btn_ng_{row['ncode']}", on_click=on_rating_button_click, args=(row['ncode'], user_name, "NG", current_my_rating, role))
 
-                # コメント欄
                 def on_comment_change():
                     new_comment = st.session_state[f"input_comment_area_{row['ncode']}"]
                     role_tmp = "原作管理チーム" if user_name in ADMIN_TEAM_USERS else "一般編集"
@@ -1239,7 +1215,6 @@ def main_content(user_name):
                 st.text_area("コメント", value=initial_comment, height=100, key=f"input_comment_area_{row['ncode']}", on_change=on_comment_change)
 
 
-            # === 右カラム：あらすじと評価一覧 ===
             with col_fragment_right:
                 st.markdown('<div class="label" style="margin-bottom: 8px;">あらすじ</div>', unsafe_allow_html=True)
                 story_text = load_novel_story(row['ncode'])
@@ -1247,7 +1222,6 @@ def main_content(user_name):
 
                 st.subheader("評価者一覧")
                 
-                # 再描画時にデータを再取得することで、自分の最新評価も反映される
                 other_ratings_df = load_novel_ratings_all(row['ncode'])
 
                 if "local_rating_patches" in st.session_state and row['ncode'] in st.session_state["local_rating_patches"]:
@@ -1295,7 +1269,6 @@ def main_content(user_name):
                     st.info("まだ評価はありません")
 
 
-    # Fragment呼び出し（UI全体をFragment内で描画）
     render_rating_area(row, user_name)
 
     st.write("")        
