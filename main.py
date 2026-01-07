@@ -234,7 +234,8 @@ def save_rating(ncode, user_name, rating, comment, role):
         except Exception as e:
             print(f"Error saving rating: {e}")
 
-    _write_to_supabase()
+    # バックグラウンド実行（UIブロック回避）
+    executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
@@ -278,7 +279,8 @@ def save_comment_only(ncode, user_name, comment, role):
         except Exception as e:
             print(f"Error saving comment: {e}")
 
-    _write_to_supabase()
+    # バックグラウンド実行（UIブロック回避）
+    executor.submit(_write_to_supabase)
     
     if "local_rating_patches" not in st.session_state:
         st.session_state["local_rating_patches"] = {}
@@ -390,16 +392,32 @@ def apply_local_patches(df, user_name):
     patches = st.session_state["local_rating_patches"]
     df_patched = df.copy()
     
-    df_all_ratings = load_all_ratings_table()
+    # 高速化: ncodeをインデックスにして検索を効率化
+    df_patched.set_index("ncode", drop=False, inplace=True)
     
+    df_all_ratings = load_all_ratings_table()
+    # 高速化: 評価データもインデックス化
+    if not df_all_ratings.empty and "ncode" in df_all_ratings.columns:
+         df_all_ratings_indexed = df_all_ratings.set_index("ncode", drop=False)
+    else:
+         df_all_ratings_indexed = pd.DataFrame()
+
     for ncode, patch in patches.items():
-        if ncode in df_patched["ncode"].values:
-            idx = df_patched[df_patched["ncode"] == ncode].index
-            df_patched.loc[idx, "my_rating"] = patch["rating"]
-            df_patched.loc[idx, "my_comment"] = patch["comment"]
+        if ncode not in df_patched.index:
+            continue
+            
+        # パッチ適用
+        df_patched.loc[ncode, "my_rating"] = patch["rating"]
+        df_patched.loc[ncode, "my_comment"] = patch["comment"]
         
-        novel_ratings = df_all_ratings[df_all_ratings["ncode"] == ncode].copy()
+        # ステータス再計算用のデータ取得（高速化版）
+        novel_ratings = pd.DataFrame()
+        if not df_all_ratings_indexed.empty and ncode in df_all_ratings_indexed.index:
+            # loc[]で返るのがSeriesかDataFrameか不定なので統一
+            res = df_all_ratings_indexed.loc[[ncode]]
+            novel_ratings = res.copy()
         
+        # 自分の新しい評価情報を反映
         my_row_idx = novel_ratings[novel_ratings["user_name"] == user_name].index
         
         new_row = {
@@ -419,23 +437,26 @@ def apply_local_patches(df, user_name):
             
         flags = determine_status(novel_ratings)
         
-        if ncode in df_patched["ncode"].values:
-            idx = df_patched[df_patched["ncode"] == ncode].index
-            
-            for flag_name, flag_val in flags.items():
-                df_patched.loc[idx, flag_name] = flag_val
-            
-            def get_disp_status_single(row):
-                if row["is_ng"]: return "NG"
-                if row["is_admin_evaluated"]: return "Admin〇△"
-                if row["is_admin_rejected"]: return "Admin×"
-                if row["is_general_evaluated"]: return "Gen〇△"
-                if row["is_general_rejected"]: return "Gen×"
-                return "-"
-            
-            df_patched.loc[idx, "classification"] = df_patched.loc[idx].apply(get_disp_status_single, axis=1)
+        # ステータス更新
+        for flag_name, flag_val in flags.items():
+            df_patched.loc[ncode, flag_name] = flag_val
+        
+        def get_disp_status_single(row):
+            if row["is_ng"]: return "NG"
+            if row["is_admin_evaluated"]: return "Admin〇△"
+            if row["is_admin_rejected"]: return "Admin×"
+            if row["is_general_evaluated"]: return "Gen〇△"
+            if row["is_general_rejected"]: return "Gen×"
+            return "-"
+        
+        # applyは行ごとなので、単一行に対して呼び出し
+        # df_patched.loc[ncode] はSeriesになるので、一度DataFrameにしてからapplyするか、直接判定する
+        # ここでは既存ロジックを維持するため Series を渡す形に
+        target_row = df_patched.loc[ncode]
+        classification = get_disp_status_single(target_row)
+        df_patched.loc[ncode, "classification"] = classification
 
-    return df_patched
+    return df_patched.reset_index(drop=True)
 
 
 # ==================================================
@@ -1123,7 +1144,6 @@ def main_content(user_name):
         except:
             return str(val)
 
-    @st.fragment
     def render_rating_area(row, user_name):
         initial_comment = row.get("my_comment")
         if pd.isna(initial_comment): initial_comment = ""
